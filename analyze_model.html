@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+  <head>
+    <title>BYD Model Analyzer</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #0f0;
+      }
+      #output {
+        white-space: pre-wrap;
+      }
+      button {
+        padding: 10px;
+        margin: 10px;
+        background: #333;
+        color: #0f0;
+        border: 1px solid #0f0;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BYD Seal GLB Model Analyzer</h1>
+    <button onclick="analyzeModel()">Analyze Model Structure</button>
+    <button onclick="downloadReport()">Download Report</button>
+    <div id="output"></div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+      let reportData = "";
+
+      window.analyzeModel = async function () {
+        const output = document.getElementById("output");
+        output.textContent = "Loading model...\n";
+
+        const loader = new GLTFLoader();
+        loader.setMeshoptDecoder(MeshoptDecoder);
+
+        try {
+          const gltf = await loader.loadAsync("./models/BYD_Seal_GLB-v1.glb");
+          const model = gltf.scene;
+
+          let report = "=== BYD SEAL GLB STRUCTURE ANALYSIS ===\n\n";
+
+          // Collect all meshes with their properties
+          const meshes = [];
+          model.traverse((child) => {
+            if (child.isMesh) {
+              const bbox = new THREE.Box3().setFromObject(child);
+              const size = new THREE.Vector3();
+              const center = new THREE.Vector3();
+              bbox.getSize(size);
+              bbox.getCenter(center);
+
+              const matName =
+                child.material?.name ||
+                (Array.isArray(child.material)
+                  ? child.material.map((m) => m.name).join(", ")
+                  : "");
+
+              meshes.push({
+                name: child.name,
+                materialName: matName,
+                position: center,
+                size: size,
+                parent: child.parent?.name || "root",
+              });
+            }
+          });
+
+          report += `Total Meshes: ${meshes.length}\n\n`;
+
+          // Group by material
+          const byMaterial = {};
+          meshes.forEach((m) => {
+            const mat = m.materialName || "no_material";
+            if (!byMaterial[mat]) byMaterial[mat] = [];
+            byMaterial[mat].push(m);
+          });
+
+          report += "=== BY MATERIAL ===\n";
+          Object.keys(byMaterial)
+            .sort()
+            .forEach((mat) => {
+              report += `\n${mat} (${byMaterial[mat].length} meshes):\n`;
+              byMaterial[mat].forEach((m) => {
+                report += `  - ${m.name}\n`;
+                report += `    Pos: (${m.position.x.toFixed(2)}, ${m.position.y.toFixed(2)}, ${m.position.z.toFixed(2)})\n`;
+                report += `    Size: (${m.size.x.toFixed(2)}, ${m.size.y.toFixed(2)}, ${m.size.z.toFixed(2)})\n`;
+              });
+            });
+
+          // Identify interior parts
+          report += "\n\n=== INTERIOR PARTS ===\n";
+          const interiorKeywords = [
+            "screen",
+            "display",
+            "dashboard",
+            "seat",
+            "steering",
+            "console",
+            "interior",
+            "carpet",
+            "leather",
+            "fabric",
+            "belt",
+            "push_button",
+          ];
+          meshes.forEach((m) => {
+            const searchText = (m.name + " " + m.materialName).toLowerCase();
+            if (interiorKeywords.some((kw) => searchText.includes(kw))) {
+              report += `${m.name} (${m.materialName})\n`;
+            }
+          });
+
+          // Identify all unique node names
+          report += "\n\n=== ALL UNIQUE NODE NAMES ===\n";
+          const uniqueNames = [...new Set(meshes.map((m) => m.name))].sort();
+          uniqueNames.forEach((name) => {
+            report += `${name}\n`;
+          });
+
+          reportData = report;
+          output.textContent = report;
+        } catch (error) {
+          output.textContent = "Error loading model: " + error.message;
+          console.error(error);
+        }
+      };
+
+      window.downloadReport = function () {
+        if (!reportData) {
+          alert("Please analyze the model first");
+          return;
+        }
+        const blob = new Blob([reportData], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "byd_seal_analysis.txt";
+        a.click();
+      };
+    </script>
+  </body>
+</html>
