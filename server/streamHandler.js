@@ -1,228 +1,37 @@
 import WebSocket from "ws";
 
-// ── Tool Definitions for OpenAI Realtime API ────────
+const mk = (name, desc, params = {}) => ({ type: "function", name, description: desc, parameters: { type: "object", properties: params } });
+const mkReq = (name, desc, params, required) => ({ type: "function", name, description: desc, parameters: { type: "object", properties: params, required } });
+
+const PARTS_ENUM = ["front_bumper","rear_bumper","hood","grille","doors","windshield","rear_window","side_windows","trunk","tailgate","wheels","headlights","taillights","mirrors","body","engine","infotainment_screen","dashboard","seats","steering_wheel","center_console","instrument_cluster","interior_trim","interior_controls"];
+
 const tools = [
-  {
-    type: "function",
-    name: "show_car_model",
-    description:
-      "Show the 3D model of the BYD Seal with a reveal animation. Call when the user wants to see the car.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "hide_car_model",
-    description:
-      "Hide the 3D car model. Call when user wants to close or hide the car view.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "show_trim_info",
-    description:
-      "Display the different trims/variants of the BYD Seal with visual comparison. Call when user asks about types, trims, or variants of the car.",
-    parameters: {
-      type: "object",
-      properties: {
-        trim: {
-          type: "string",
-          description: "Specific trim to highlight, or all to show all",
-          enum: ["all", "premium", "excellence", "flagship"],
-        },
-      },
-      required: ["trim"],
-    },
-  },
-  {
-    type: "function",
-    name: "open_bonnet",
-    description:
-      "Open the bonnet/hood of the 3D car to reveal the engine bay. Call when user wants to see the engine.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "close_bonnet",
-    description: "Close the bonnet/hood of the 3D car model.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "play_engine_start",
-    description:
-      "Play the BYD Seal engine start-up sound. Call when user wants to hear the car starting.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "play_engine_running",
-    description:
-      "Play the BYD Seal engine running/driving sound. Call when user wants to hear the car running or driving.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "change_car_color",
-    description:
-      "Change the color of the 3D car model. Call when user asks to change or see a specific color.",
-    parameters: {
-      type: "object",
-      properties: {
-        color: {
-          type: "string",
-          description: "Color name",
-          enum: ["white", "black", "silver", "blue", "red"],
-        },
-      },
-      required: ["color"],
-    },
-  },
-  {
-    type: "function",
-    name: "highlight_part",
-    description:
-      "Highlight and zoom into a specific car part on the 3D model. Call when user wants to see or asks about any specific car part including exterior (wheels, doors, bumper, lights) and INTERIOR parts (infotainment screen, dashboard, seats, steering wheel). The camera will intelligently rotate to face the part and zoom in for a detailed view.",
-    parameters: {
-      type: "object",
-      properties: {
-        part: {
-          type: "string",
-          description: "The car part to highlight",
-          enum: [
-            "front_bumper",
-            "rear_bumper",
-            "hood",
-            "grille",
-            "doors",
-            "windshield",
-            "rear_window",
-            "side_windows",
-            "trunk",
-            "tailgate",
-            "wheels",
-            "headlights",
-            "taillights",
-            "mirrors",
-            "body",
-            "engine",
-            "infotainment_screen",
-            "dashboard",
-            "seats",
-            "steering_wheel",
-            "center_console",
-            "instrument_cluster",
-            "interior_trim",
-            "interior_controls",
-          ],
-        },
-      },
-      required: ["part"],
-    },
-  },
-  {
-    type: "function",
-    name: "show_360_view",
-    description:
-      "Show a 360-degree rotating view of the car. The camera will orbit around the car in a complete circle, showing it from all angles. Call when user asks for '360 view', 'rotate the car', 'show me all angles', 'spin the car', or wants to see the car from every side.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "switch_to_interior",
-    description:
-      "Switch to the interior view of the car, showing the cabin from the driver or rear passenger perspective. Call when the user wants to see the interior, cabin, inside of the car, dashboard view, or seating.",
-    parameters: {
-      type: "object",
-      properties: {
-        row: {
-          type: "integer",
-          description:
-            "Which seating row to view from. 1 = front (driver) row, 2 = rear row.",
-          enum: [1, 2],
-        },
-      },
-      required: ["row"],
-    },
-  },
-  {
-    type: "function",
-    name: "switch_to_exterior",
-    description:
-      "Switch back to the exterior view of the car. Call when the user wants to see the outside of the car again after viewing the interior.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "camera_preset",
-    description:
-      "Move the camera to a professional preset angle for viewing the car. Available presets: front, rear, side_left, side_right, three_quarter, top.",
-    parameters: {
-      type: "object",
-      properties: {
-        preset: {
-          type: "string",
-          description: "The camera preset name",
-          enum: [
-            "front",
-            "rear",
-            "side_left",
-            "side_right",
-            "three_quarter",
-            "top",
-          ],
-        },
-      },
-      required: ["preset"],
-    },
-  },
-  {
-    type: "function",
-    name: "open_all_doors",
-    description:
-      "Open all doors, trunk, and hood of the car to show the full interior access and open-car view. Call when user wants to see all doors open or wants a full view of the opened car.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "close_all_doors",
-    description: "Close all doors, trunk, and hood of the car.",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    type: "function",
-    name: "toggle_hotspots",
-    description:
-      "Show or hide interactive information hotspot markers on the car. These are clickable (i) icons that users can tap for details about specific car parts.",
-    parameters: {
-      type: "object",
-      properties: {
-        visible: {
-          type: "boolean",
-          description: "true to show hotspots, false to hide them",
-        },
-      },
-      required: ["visible"],
-    },
-  },
-  {
-    type: "function",
-    name: "show_tech_specs",
-    description:
-      "Show or hide the technical specifications panel displaying horsepower, 0-100 time, and range. Call when user asks about performance or technical details visually.",
-    parameters: {
-      type: "object",
-      properties: {
-        visible: {
-          type: "boolean",
-          description: "true to show the tech panel, false to hide it",
-        },
-      },
-      required: ["visible"],
-    },
-  },
+  mk("show_car_model",      "Show the 3D model of the BYD Seal with a reveal animation. Call when the user wants to see the car."),
+  mk("hide_car_model",      "Hide the 3D car model. Call when user wants to close or hide the car view."),
+  mk("open_bonnet",         "Open the bonnet/hood of the 3D car to reveal the engine bay. Call when user wants to see the engine."),
+  mk("close_bonnet",        "Close the bonnet/hood of the 3D car model."),
+  mk("play_engine_start",   "Play the BYD Seal engine start-up sound. Call when user wants to hear the car starting."),
+  mk("play_engine_running", "Play the BYD Seal engine running/driving sound. Call when user wants to hear the car running or driving."),
+  mk("show_360_view",       "Show a 360-degree rotating view of the car. The camera will orbit around the car in a complete circle, showing it from all angles. Call when user asks for '360 view', 'rotate the car', 'show me all angles', 'spin the car', or wants to see the car from every side."),
+  mk("switch_to_exterior",  "Switch back to the exterior view of the car. Call when the user wants to see the outside of the car again after viewing the interior."),
+  mk("open_all_doors",      "Open all doors, trunk, and hood of the car to show the full interior access and open-car view. Call when user wants to see all doors open or wants a full view of the opened car."),
+  mk("close_all_doors",     "Close all doors, trunk, and hood of the car."),
+  mkReq("show_trim_info",   "Display the different trims/variants of the BYD Seal with visual comparison. Call when user asks about types, trims, or variants of the car.",
+    { trim: { type: "string", description: "Specific trim to highlight, or all to show all", enum: ["all","premium","excellence","flagship"] } }, ["trim"]),
+  mkReq("change_car_color", "Change the color of the 3D car model. Call when user asks to change or see a specific color.",
+    { color: { type: "string", description: "Color name", enum: ["white","black","silver","blue","red"] } }, ["color"]),
+  mkReq("highlight_part",   "Highlight and zoom into a specific car part on the 3D model. Call when user wants to see or asks about any specific car part including exterior (wheels, doors, bumper, lights) and INTERIOR parts (infotainment screen, dashboard, seats, steering wheel). The camera will intelligently rotate to face the part and zoom in for a detailed view.",
+    { part: { type: "string", description: "The car part to highlight", enum: PARTS_ENUM } }, ["part"]),
+  mkReq("switch_to_interior","Switch to the interior view of the car, showing the cabin from the driver or rear passenger perspective. Call when the user wants to see the interior, cabin, inside of the car, dashboard view, or seating.",
+    { row: { type: "integer", description: "Which seating row to view from. 1 = front (driver) row, 2 = rear row.", enum: [1, 2] } }, ["row"]),
+  mkReq("camera_preset",    "Move the camera to a professional preset angle for viewing the car. Available presets: front, rear, side_left, side_right, three_quarter, top.",
+    { preset: { type: "string", description: "The camera preset name", enum: ["front","rear","side_left","side_right","three_quarter","top"] } }, ["preset"]),
+  mkReq("toggle_hotspots",  "Show or hide interactive information hotspot markers on the car. These are clickable (i) icons that users can tap for details about specific car parts.",
+    { visible: { type: "boolean", description: "true to show hotspots, false to hide them" } }, ["visible"]),
+  mkReq("show_tech_specs",  "Show or hide the technical specifications panel displaying horsepower, 0-100 time, and range. Call when user asks about performance or technical details visually.",
+    { visible: { type: "boolean", description: "true to show the tech panel, false to hide it" } }, ["visible"]),
 ];
 
-// ── BYD Seal Knowledge Base ──────────────────────
 const SYSTEM_INSTRUCTIONS = `
 You are the BYD Seal intelligent voice assistant. You are enthusiastic, knowledgeable, and helpful.
 
@@ -349,7 +158,7 @@ You are the BYD Seal intelligent voice assistant. You are enthusiastic, knowledg
 - When the user wants to change COLOR (e.g., "make it red", "change color to blue") → call change_car_color
 - **CRITICAL FOR INTERIOR PARTS**: When the user asks to see ANY interior part like "infotainment screen", "music system", "screen", "display", "dashboard", "seats", "steering wheel", "center console", or "instrument cluster" → YOU MUST call highlight_part with the exact part name (e.g., "infotainment_screen", "dashboard", "seats", "steering_wheel", "center_console", "instrument_cluster"). The camera will automatically move INSIDE the car to show the interior view. DO NOT just describe it - ALWAYS call the tool.
 - When the user mentions or asks about EXTERIOR parts (wheels, doors, bumper, grille, headlights, taillights, mirrors, trunk, windshield, body) → call highlight_part with the correct part name. The camera will rotate to face the part. If the car is hidden, call show_car_model first.
-- When the user wants a 360-DEGREE VIEW / \"rotate the car\" / \"show me all angles\" / \"spin it around\" / \"show me from every side\" → call show_360_view. This will smoothly rotate the camera around the car.
+- When the user wants a 360-DEGREE VIEW / "rotate the car" / "show me all angles" / "spin it around" / "show me from every side" → call show_360_view. This will smoothly rotate the camera around the car.
 - VISIBILITY MANAGEMENT: The 3D car is a focused demonstration tool. Keep it visible as long as the conversation is about its design, features, parts, or any visual aspect. Once the user shifts to general questions (e.g., about company history, general specs not requiring visual aid, or unrelated topics), call hide_car_model to focus back on the conversation.
 - When the user explicitly wants to HIDE / close the car view → call hide_car_model
 - When the user wants to close the bonnet/hood → call close_bonnet
@@ -399,250 +208,84 @@ YOU MUST: Call highlight_part with part="steering_wheel" FIRST, then describe it
 - Suggest using interior view when discussing cabin features, and exterior view when discussing design elements
 `.trim();
 
-// ── Connection Handler ──────────────────────────────
 export function handleConnection(clientWs) {
-  const OPENAI_URL =
-    "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17";
-
-  const openaiWs = new WebSocket(OPENAI_URL, {
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "OpenAI-Beta": "realtime=v1",
-    },
+  const openaiWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17", {
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "OpenAI-Beta": "realtime=v1" },
   });
 
-  // Track function call accumulations
-  const pendingCalls = new Map(); // callId -> { name, args }
+  const pendingCalls = new Map();
+  const sendToClient = obj => clientWs.readyState === clientWs.OPEN && clientWs.send(JSON.stringify(obj));
 
   openaiWs.on("open", () => {
-    console.log("[OpenAI] Connected to Realtime API");
-
-    // Configure session
-    openaiWs.send(
-      JSON.stringify({
-        type: "session.update",
-        session: {
-          modalities: ["text", "audio"],
-          voice: "alloy",
-          instructions: SYSTEM_INSTRUCTIONS,
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          input_audio_transcription: {
-            model: "whisper-1",
-          },
-          turn_detection: {
-            type: "server_vad",
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-          },
-          tools: tools,
-          tool_choice: "auto",
-          temperature: 0.7,
-        },
-      }),
-    );
-
-    // Notify client
+    console.log("[OpenAI] Connected");
+    openaiWs.send(JSON.stringify({
+      type: "session.update",
+      session: {
+        modalities: ["text", "audio"],
+        voice: "alloy",
+        instructions: SYSTEM_INSTRUCTIONS,
+        input_audio_format: "pcm16",
+        output_audio_format: "pcm16",
+        input_audio_transcription: { model: "whisper-1" },
+        turn_detection: { type: "server_vad", threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 500 },
+        tools,
+        tool_choice: "auto",
+        temperature: 0.7,
+      },
+    }));
     sendToClient({ type: "status", status: "connected" });
   });
 
-  openaiWs.on("message", (data) => {
-    let event;
-    try {
-      event = JSON.parse(data.toString());
-    } catch {
-      return;
-    }
-
-    switch (event.type) {
-      // ── Audio output ──
-      case "response.audio.delta":
-        sendToClient({
-          type: "audio.delta",
-          delta: event.delta,
-        });
-        break;
-
-      // ── Transcript (assistant) ──
-      case "response.audio_transcript.delta":
-        sendToClient({
-          type: "transcript.delta",
-          role: "assistant",
-          delta: event.delta,
-        });
-        break;
-
-      case "response.audio_transcript.done":
-        sendToClient({
-          type: "transcript.done",
-          role: "assistant",
-          transcript: event.transcript,
-        });
-        break;
-
-      // ── User transcript ──
-      case "conversation.item.input_audio_transcription.completed":
-        sendToClient({
-          type: "transcript.done",
-          role: "user",
-          transcript: event.transcript,
-        });
-        break;
-
-      // ── Speech detection ──
-      case "input_audio_buffer.speech_started":
-        sendToClient({ type: "speech.started" });
-        break;
-
-      case "input_audio_buffer.speech_stopped":
-        sendToClient({ type: "speech.stopped" });
-        break;
-
-      // ── Response lifecycle ──
-      case "response.created":
-        sendToClient({ type: "status", status: "speaking" });
-        break;
-
-      case "response.done":
-        sendToClient({ type: "status", status: "listening" });
-        break;
-
-      // ── Function calls ──
-      case "response.output_item.added":
-        if (event.item && event.item.type === "function_call") {
-          pendingCalls.set(event.item.id, {
-            name: event.item.name,
-            callId: event.item.call_id,
-            args: "",
-          });
-        }
-        break;
-
-      case "response.function_call_arguments.delta":
-        if (event.item_id && pendingCalls.has(event.item_id)) {
-          pendingCalls.get(event.item_id).args += event.delta;
-        }
-        break;
-
-      case "response.function_call_arguments.done": {
-        const call = pendingCalls.get(event.item_id);
-        if (!call) break;
-        pendingCalls.delete(event.item_id);
-
-        let args = {};
-        try {
-          args = JSON.parse(call.args || "{}");
-        } catch {}
-
-        console.log(`[Tool] ${call.name}`, args);
-
-        // Send UI command to client
-        sendToClient({
-          type: "ui.command",
-          tool: call.name,
-          args: args,
-        });
-
-        // Send function output back to OpenAI
-        openaiWs.send(
-          JSON.stringify({
-            type: "conversation.item.create",
-            item: {
-              type: "function_call_output",
-              call_id: call.callId,
-              output: JSON.stringify({
-                success: true,
-                message: `${call.name} executed successfully`,
-              }),
-            },
-          }),
-        );
-
-        // Ask OpenAI to continue responding
-        openaiWs.send(
-          JSON.stringify({
-            type: "response.create",
-          }),
-        );
-        break;
-      }
-
-      // ── Errors ──
-      case "error":
-        console.error("[OpenAI Error]", event.error);
-        sendToClient({
-          type: "error",
-          message: event.error?.message || "Unknown error",
-        });
-        break;
-
-      default:
-        // Silently ignore other event types
-        break;
-    }
-  });
-
-  openaiWs.on("error", (err) => {
-    console.error("[OpenAI WS Error]", err.message);
-    sendToClient({ type: "error", message: "Connection to AI failed" });
-  });
-
-  openaiWs.on("close", (code, reason) => {
-    console.log(`[OpenAI] Disconnected: ${code} ${reason}`);
-    sendToClient({ type: "status", status: "disconnected" });
-  });
-
-  // ── Client → OpenAI relay ────────────────────
-
-  clientWs.on("message", (data) => {
-    let msg;
-    try {
-      msg = JSON.parse(data.toString());
-    } catch {
-      return;
-    }
-
-    if (openaiWs.readyState !== WebSocket.OPEN) return;
-
-    // Relay audio input to OpenAI
-    if (msg.type === "input_audio_buffer.append") {
-      openaiWs.send(
-        JSON.stringify({
-          type: "input_audio_buffer.append",
-          audio: msg.audio,
-        }),
-      );
-    }
-
-    // Relay audio commit (end of speech segment)
-    if (msg.type === "input_audio_buffer.commit") {
-      openaiWs.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
-    }
-
-    // Relay text input or other conversation items
-    if (msg.type === "conversation.item.create") {
-      openaiWs.send(JSON.stringify(msg));
-      // Trigger a response for the new item
+  const handlers = {
+    "response.audio.delta":       e => sendToClient({ type: "audio.delta", delta: e.delta }),
+    "response.audio_transcript.delta": e => sendToClient({ type: "transcript.delta", role: "assistant", delta: e.delta }),
+    "response.audio_transcript.done":  e => sendToClient({ type: "transcript.done", role: "assistant", transcript: e.transcript }),
+    "conversation.item.input_audio_transcription.completed": e => sendToClient({ type: "transcript.done", role: "user", transcript: e.transcript }),
+    "input_audio_buffer.speech_started": () => sendToClient({ type: "speech.started" }),
+    "input_audio_buffer.speech_stopped": () => sendToClient({ type: "speech.stopped" }),
+    "response.created": () => sendToClient({ type: "status", status: "speaking" }),
+    "response.done":    () => sendToClient({ type: "status", status: "listening" }),
+    "response.output_item.added": e => {
+      if (e.item?.type === "function_call") pendingCalls.set(e.item.id, { name: e.item.name, callId: e.item.call_id, args: "" });
+    },
+    "response.function_call_arguments.delta": e => {
+      if (pendingCalls.has(e.item_id)) pendingCalls.get(e.item_id).args += e.delta;
+    },
+    "response.function_call_arguments.done": e => {
+      const call = pendingCalls.get(e.item_id);
+      if (!call) return;
+      pendingCalls.delete(e.item_id);
+      let args = {}; try { args = JSON.parse(call.args || "{}"); } catch {}
+      console.log(`[Tool] ${call.name}`, args);
+      sendToClient({ type: "ui.command", tool: call.name, args });
+      openaiWs.send(JSON.stringify({ type: "conversation.item.create", item: { type: "function_call_output", call_id: call.callId, output: JSON.stringify({ success: true }) } }));
       openaiWs.send(JSON.stringify({ type: "response.create" }));
-    }
+    },
+    "error": e => { console.error("[OpenAI Error]", e.error); sendToClient({ type: "error", message: e.error?.message || "Unknown error" }); },
+  };
 
-    // Manual response trigger
-    if (msg.type === "response.create") {
-      openaiWs.send(JSON.stringify(msg));
-    }
+  openaiWs.on("message", data => {
+    let event; try { event = JSON.parse(data.toString()); } catch { return; }
+    handlers[event.type]?.(event);
+  });
+
+  openaiWs.on("error", err => { console.error("[OpenAI WS Error]", err.message); sendToClient({ type: "error", message: "Connection to AI failed" }); });
+  openaiWs.on("close", (code, reason) => { console.log(`[OpenAI] Disconnected: ${code} ${reason}`); sendToClient({ type: "status", status: "disconnected" }); });
+
+  const clientHandlers = {
+    "input_audio_buffer.append":  m => openaiWs.send(JSON.stringify({ type: "input_audio_buffer.append", audio: m.audio })),
+    "input_audio_buffer.commit":  () => openaiWs.send(JSON.stringify({ type: "input_audio_buffer.commit" })),
+    "conversation.item.create":   m => { openaiWs.send(JSON.stringify(m)); openaiWs.send(JSON.stringify({ type: "response.create" })); },
+    "response.create":            m => openaiWs.send(JSON.stringify(m)),
+  };
+
+  clientWs.on("message", data => {
+    let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
+    if (openaiWs.readyState === WebSocket.OPEN) clientHandlers[msg.type]?.(msg);
   });
 
   clientWs.on("close", () => {
     console.log("[WS] Client disconnected");
-    if (openaiWs.readyState === WebSocket.OPEN) {
-      openaiWs.close();
-    }
+    if (openaiWs.readyState === WebSocket.OPEN) openaiWs.close();
   });
-
-  function sendToClient(obj) {
-    if (clientWs.readyState === clientWs.OPEN) {
-      clientWs.send(JSON.stringify(obj));
-    }
-  }
 }

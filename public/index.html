@@ -6,33 +6,28 @@
     <title>BYD Seal — 3D Voice Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
     <div class="app">
-      <!-- Header -->
       <header class="header">
         <div class="brand">
           <h1 class="brand-title">BYD <span>Seal</span></h1>
           <p class="brand-tagline">3D Interactive Voice Assistant</p>
         </div>
+        <button id="showroom-toggle-btn" class="showroom-toggle-btn" title="Toggle 3D View">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span>3D View</span>
+        </button>
         <div id="status" class="status disconnected">
           <span class="status-dot"></span>
           <span id="status-text">Disconnected</span>
         </div>
       </header>
-
-      <!-- Main Content -->
       <main class="main">
-        <!-- 3D Viewport -->
         <section class="viewport" id="viewport">
           <canvas id="three-canvas"></canvas>
-
-          <!-- Viewport Toolbar (top-right) -->
           <div id="viewport-toolbar" class="viewport-toolbar hidden">
             <div class="view-toggle">
               <button id="btn-exterior" class="view-toggle-btn active" data-view="exterior">Exterior</button>
@@ -49,8 +44,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Technical Details Panel (left side) -->
           <div id="tech-details-panel" class="tech-details-panel hidden">
             <div class="tech-header">
               <span>Technical Details</span>
@@ -71,18 +64,12 @@
               </div>
             </div>
           </div>
-
-          <!-- Hotspot Markers Container -->
           <div id="hotspot-container" class="hotspot-container"></div>
-
-          <!-- Hotspot Info Popup -->
           <div id="hotspot-popup" class="hotspot-popup hidden">
             <button id="hotspot-popup-close" class="hotspot-popup-close">&times;</button>
             <h3 id="hotspot-popup-title" class="hotspot-popup-title"></h3>
             <p id="hotspot-popup-body" class="hotspot-popup-body"></p>
           </div>
-
-          <!-- Bottom Navigation Bar -->
           <div id="bottom-nav" class="bottom-nav hidden">
             <button class="bottom-nav-btn" data-preset="front" title="Front View">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/></svg>
@@ -103,116 +90,44 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.22-8.56"/><path d="M21 3v5h-5"/></svg>
             </button>
           </div>
-
-          <!-- Interior "Tap to Rotate" hint -->
           <div id="interior-hint" class="interior-hint hidden">Tap to Rotate</div>
-
-          <!-- Trim comparison overlay -->
           <div id="trim-panel" class="trim-panel hidden"></div>
-
-          <!-- Car info overlay -->
           <div id="car-info-overlay" class="car-info-overlay hidden"></div>
         </section>
-
-        <!-- Side Panel -->
         <aside class="panel">
-          <!-- Chat transcript -->
           <div class="chat" id="chat">
             <div class="chat-welcome">
               <div class="chat-welcome-icon">
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path
-                    d="M12 18.5a6.5 6.5 0 006.5-6.5V8a6.5 6.5 0 00-13 0v4a6.5 6.5 0 006.5 6.5z"
-                  />
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 18.5a6.5 6.5 0 006.5-6.5V8a6.5 6.5 0 00-13 0v4a6.5 6.5 0 006.5 6.5z" />
                   <path d="M12 18.5V22m-4 0h8" />
                 </svg>
               </div>
-              <p>
-                Click the mic button and ask me anything about the
-                <strong>BYD Seal</strong>.
-              </p>
-              <p class="chat-hint">
-                Try: "Show me the car" or "Tell me about the engine"
-              </p>
+              <p>Click the mic button and ask me anything about the <strong>BYD Seal</strong>.</p>
+              <p class="chat-hint">Try: "Show me the car" or "Tell me about the engine"</p>
             </div>
           </div>
-
-          <!-- Voice section -->
           <div class="voice-section">
-            <!-- Visualizer bars -->
             <div class="visualizer" id="visualizer">
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
             </div>
-
-            <!-- Text input option -->
             <div class="input-container">
-              <input
-                type="text"
-                id="chat-input"
-                placeholder="Type a message..."
-                autocomplete="off"
-              />
+              <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
               <button id="send-btn" title="Send message">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                </svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
               </button>
             </div>
-
-            <!-- Mic button -->
             <button class="mic-btn" id="mic-btn" title="Hold to speak">
-              <svg
-                class="mic-icon"
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+              <svg class="mic-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 1a4 4 0 00-4 4v7a4 4 0 008 0V5a4 4 0 00-4-4z" />
                 <path d="M19 10v2a7 7 0 01-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="23" />
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
-              <svg
-                class="stop-icon hidden"
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
+              <svg class="stop-icon hidden" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
@@ -221,15 +136,8 @@
         </aside>
       </main>
     </div>
-
-    <!-- Three.js via importmap -->
     <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
-        }
-      }
+      { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
     </script>
     <script type="module" src="./js/main.js"></script>
   </body>

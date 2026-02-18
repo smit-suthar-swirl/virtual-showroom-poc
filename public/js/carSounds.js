@@ -6,320 +6,137 @@ export class CarSounds {
   }
 
   ensureContext() {
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-    }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.ctx) this.ctx = new AudioContext();
+    if (this.ctx.state === "suspended") this.ctx.resume();
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.5;
     this.masterGain.connect(this.ctx.destination);
   }
 
   stop() {
-    this.activeNodes.forEach(n => {
-      try { n.stop(); } catch (e) { /* already stopped */ }
-    });
+    this.activeNodes.forEach(n => { try { n.stop(); } catch {} });
     this.activeNodes = [];
-    if (this.masterGain) {
-      try { this.masterGain.disconnect(); } catch (e) {}
-    }
+    try { this.masterGain?.disconnect(); } catch {}
   }
 
   createNoiseBuffer(duration) {
-    const sr = this.ctx.sampleRate;
-    const len = sr * duration;
+    const sr = this.ctx.sampleRate, len = sr * duration;
     const buf = this.ctx.createBuffer(1, len, sr);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     return buf;
   }
 
-  // ── Engine Start Sound ────────────────────────
+  _osc(type, freqRamps, gainRamps, start, stop) {
+    const ctx = this.ctx, now = ctx.currentTime, out = this.masterGain;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    freqRamps.forEach(([t, v, exp]) =>
+      exp ? osc.frequency.exponentialRampToValueAtTime(v, now + t) : osc.frequency.setValueAtTime(v, now + t)
+    );
+    const g = ctx.createGain();
+    gainRamps.forEach(([t, v, exp]) =>
+      exp ? g.gain.exponentialRampToValueAtTime(v, now + t) : g.gain.linearRampToValueAtTime(v, now + t)
+    );
+    osc.connect(g).connect(out);
+    osc.start(now + start);
+    osc.stop(now + stop);
+    this.activeNodes.push(osc);
+    return osc;
+  }
+
+  _noise(duration, filterType, filterFreq, filterQ, gainRamps, start, stop, loop = false) {
+    const ctx = this.ctx, now = ctx.currentTime, out = this.masterGain;
+    const src = ctx.createBufferSource();
+    src.buffer = this.createNoiseBuffer(duration);
+    src.loop = loop;
+    const f = ctx.createBiquadFilter();
+    f.type = filterType; f.frequency.value = filterFreq;
+    if (filterQ) f.Q.value = filterQ;
+    const g = ctx.createGain();
+    gainRamps.forEach(([t, v]) => g.gain.linearRampToValueAtTime(v, now + t));
+    src.connect(f).connect(g).connect(out);
+    src.start(now + start);
+    src.stop(now + stop);
+    this.activeNodes.push(src);
+  }
+
   playStartup() {
     this.ensureContext();
     this.stop();
-    this.ensureContext(); // re-create masterGain after stop
+    this.ensureContext();
+    const now = this.ctx.currentTime;
 
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const out = this.masterGain;
+    // Electric whine
+    this._osc("sine",
+      [[0, 180, false], [0.8, 750, true], [1.5, 350, true]],
+      [[0, 0.25, false], [1.5, 0.12, false], [2.0, 0, false]], 0, 2.0);
+    this._osc("sine",
+      [[0, 360, false], [0.8, 1500, true], [1.5, 700, true]],
+      [[0, 0.06, false], [1.8, 0, false]], 0, 1.8);
 
-    // ── Phase 1: Electric system wake-up whine (0 – 1.5s) ──
-    const elec = ctx.createOscillator();
-    elec.type = 'sine';
-    elec.frequency.setValueAtTime(180, now);
-    elec.frequency.exponentialRampToValueAtTime(750, now + 0.8);
-    elec.frequency.exponentialRampToValueAtTime(350, now + 1.5);
+    // Starter crank
+    this._noise(1.2, "bandpass", 280, 2.5, (() => {
+      const pts = [];
+      for (let i = 0; i < 10; i++) { pts.push([0.3 + i * 0.09, 0.22]); pts.push([0.3 + i * 0.09 + 0.045, 0.04]); }
+      pts.push([1.2, 0.04], [1.4, 0]);
+      return pts;
+    })(), 0.3, 1.5);
 
-    const elecGain = ctx.createGain();
-    elecGain.gain.setValueAtTime(0.25, now);
-    elecGain.gain.linearRampToValueAtTime(0.12, now + 1.5);
-    elecGain.gain.linearRampToValueAtTime(0, now + 2.0);
+    // Engine catch
+    this._osc("sawtooth",
+      [[1.2, 30, false], [1.8, 58, true], [3.5, 26, true], [5.0, 26, false]],
+      [[1.2, 0, false], [1.6, 0.28, false], [3.5, 0.14, false], [5.0, 0.1, false], [6.0, 0, false]], 1.2, 6.0);
+    this._osc("sine",
+      [[1.2, 60, false], [1.8, 116, true], [3.5, 52, true]],
+      [[1.2, 0, false], [1.8, 0.1, false], [3.5, 0.05, false], [6.0, 0, false]], 1.2, 6.0);
+    this._osc("sine",
+      [[1.2, 15, false], [1.8, 29, true], [3.5, 13, true]],
+      [[1.2, 0, false], [1.8, 0.15, false], [3.5, 0.08, false], [6.0, 0, false]], 1.2, 6.0);
 
-    elec.connect(elecGain).connect(out);
-    elec.start(now);
-    elec.stop(now + 2.0);
-    this.activeNodes.push(elec);
+    // Exhaust pop
+    this._noise(0.6, "lowpass", 120, 0,
+      [[1.25, 0], [1.35, 0.35], [2.0, 0.01]], 1.25, 2.1);
 
-    // Subtle secondary harmonic
-    const elec2 = ctx.createOscillator();
-    elec2.type = 'sine';
-    elec2.frequency.setValueAtTime(360, now);
-    elec2.frequency.exponentialRampToValueAtTime(1500, now + 0.8);
-    elec2.frequency.exponentialRampToValueAtTime(700, now + 1.5);
-    const elec2Gain = ctx.createGain();
-    elec2Gain.gain.setValueAtTime(0.06, now);
-    elec2Gain.gain.linearRampToValueAtTime(0, now + 1.8);
-    elec2.connect(elec2Gain).connect(out);
-    elec2.start(now);
-    elec2.stop(now + 1.8);
-    this.activeNodes.push(elec2);
-
-    // ── Phase 2: Starter motor crank (0.3 – 1.3s) ──
-    const starterBuf = this.createNoiseBuffer(1.2);
-    const starter = ctx.createBufferSource();
-    starter.buffer = starterBuf;
-
-    const starterBP = ctx.createBiquadFilter();
-    starterBP.type = 'bandpass';
-    starterBP.frequency.value = 280;
-    starterBP.Q.value = 2.5;
-
-    const starterGain = ctx.createGain();
-    // Pulse to simulate cranking
-    for (let i = 0; i < 10; i++) {
-      const t = now + 0.3 + i * 0.09;
-      starterGain.gain.setValueAtTime(0.22, t);
-      starterGain.gain.linearRampToValueAtTime(0.04, t + 0.045);
-    }
-    starterGain.gain.setValueAtTime(0.04, now + 1.2);
-    starterGain.gain.linearRampToValueAtTime(0, now + 1.4);
-
-    starter.connect(starterBP).connect(starterGain).connect(out);
-    starter.start(now + 0.3);
-    starter.stop(now + 1.5);
-    this.activeNodes.push(starter);
-
-    // ── Phase 3: Combustion engine catch & idle (1.2 – 5.5s) ──
-    // Primary engine oscillator (sawtooth for rich harmonics)
-    const eng1 = ctx.createOscillator();
-    eng1.type = 'sawtooth';
-    eng1.frequency.setValueAtTime(30, now + 1.2);
-    eng1.frequency.exponentialRampToValueAtTime(58, now + 1.8);  // rev up on catch
-    eng1.frequency.exponentialRampToValueAtTime(26, now + 3.5);  // settle to idle
-    eng1.frequency.setValueAtTime(26, now + 5.0);
-
-    const eng1LP = ctx.createBiquadFilter();
-    eng1LP.type = 'lowpass';
-    eng1LP.frequency.value = 180;
-    eng1LP.Q.value = 1;
-
-    const eng1Gain = ctx.createGain();
-    eng1Gain.gain.setValueAtTime(0, now + 1.2);
-    eng1Gain.gain.linearRampToValueAtTime(0.28, now + 1.6);
-    eng1Gain.gain.linearRampToValueAtTime(0.14, now + 3.5);
-    eng1Gain.gain.linearRampToValueAtTime(0.1, now + 5.0);
-    eng1Gain.gain.linearRampToValueAtTime(0, now + 6.0);
-
-    eng1.connect(eng1LP).connect(eng1Gain).connect(out);
-    eng1.start(now + 1.2);
-    eng1.stop(now + 6.0);
-    this.activeNodes.push(eng1);
-
-    // 2nd harmonic
-    const eng2 = ctx.createOscillator();
-    eng2.type = 'sine';
-    eng2.frequency.setValueAtTime(60, now + 1.2);
-    eng2.frequency.exponentialRampToValueAtTime(116, now + 1.8);
-    eng2.frequency.exponentialRampToValueAtTime(52, now + 3.5);
-
-    const eng2Gain = ctx.createGain();
-    eng2Gain.gain.setValueAtTime(0, now + 1.2);
-    eng2Gain.gain.linearRampToValueAtTime(0.1, now + 1.8);
-    eng2Gain.gain.linearRampToValueAtTime(0.05, now + 3.5);
-    eng2Gain.gain.linearRampToValueAtTime(0, now + 6.0);
-
-    eng2.connect(eng2Gain).connect(out);
-    eng2.start(now + 1.2);
-    eng2.stop(now + 6.0);
-    this.activeNodes.push(eng2);
-
-    // 3rd sub-harmonic for depth
-    const eng3 = ctx.createOscillator();
-    eng3.type = 'sine';
-    eng3.frequency.setValueAtTime(15, now + 1.2);
-    eng3.frequency.exponentialRampToValueAtTime(29, now + 1.8);
-    eng3.frequency.exponentialRampToValueAtTime(13, now + 3.5);
-
-    const eng3Gain = ctx.createGain();
-    eng3Gain.gain.setValueAtTime(0, now + 1.2);
-    eng3Gain.gain.linearRampToValueAtTime(0.15, now + 1.8);
-    eng3Gain.gain.linearRampToValueAtTime(0.08, now + 3.5);
-    eng3Gain.gain.linearRampToValueAtTime(0, now + 6.0);
-
-    eng3.connect(eng3Gain).connect(out);
-    eng3.start(now + 1.2);
-    eng3.stop(now + 6.0);
-    this.activeNodes.push(eng3);
-
-    // ── Exhaust pop at ignition ──
-    const exBuf = this.createNoiseBuffer(0.6);
-    const exhaust = ctx.createBufferSource();
-    exhaust.buffer = exBuf;
-
-    const exLP = ctx.createBiquadFilter();
-    exLP.type = 'lowpass';
-    exLP.frequency.value = 120;
-
-    const exGain = ctx.createGain();
-    exGain.gain.setValueAtTime(0, now + 1.25);
-    exGain.gain.linearRampToValueAtTime(0.35, now + 1.35);
-    exGain.gain.exponentialRampToValueAtTime(0.01, now + 2.0);
-
-    exhaust.connect(exLP).connect(exGain).connect(out);
-    exhaust.start(now + 1.25);
-    exhaust.stop(now + 2.1);
-    this.activeNodes.push(exhaust);
-
-    // ── Cabin relay clicks (subtle) ──
-    const click = ctx.createOscillator();
-    click.type = 'square';
-    click.frequency.value = 3000;
-    const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(0, now);
-    clickGain.gain.setValueAtTime(0.04, now + 0.05);
-    clickGain.gain.linearRampToValueAtTime(0, now + 0.08);
-    clickGain.gain.setValueAtTime(0.03, now + 0.15);
-    clickGain.gain.linearRampToValueAtTime(0, now + 0.18);
-    click.connect(clickGain).connect(out);
-    click.start(now);
-    click.stop(now + 0.2);
-    this.activeNodes.push(click);
+    // Cabin clicks
+    this._osc("square", [[0, 3000, false]],
+      [[0, 0, false], [0.05, 0.04, false], [0.08, 0, false], [0.15, 0.03, false], [0.18, 0, false]], 0, 0.2);
   }
 
-  // ── Engine Running / Driving Sound ────────────
   playRunning() {
     this.ensureContext();
     this.stop();
     this.ensureContext();
+    const now = this.ctx.currentTime, out = this.masterGain;
 
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const out = this.masterGain;
-
-    // ── Base engine frequency ~45Hz with RPM flutter ──
-    const base = ctx.createOscillator();
-    base.type = 'sawtooth';
+    // Base engine with LFO
+    const base = this.ctx.createOscillator();
+    base.type = "sawtooth";
     base.frequency.setValueAtTime(38, now);
     base.frequency.linearRampToValueAtTime(48, now + 1.0);
+    const lfo = this.ctx.createOscillator();
+    lfo.type = "sine"; lfo.frequency.value = 0.4;
+    const lfoG = this.ctx.createGain(); lfoG.gain.value = 4;
+    lfo.connect(lfoG).connect(base.frequency);
+    lfo.start(now); this.activeNodes.push(lfo);
+    const baseLP = this.ctx.createBiquadFilter();
+    baseLP.type = "lowpass"; baseLP.frequency.value = 220; baseLP.Q.value = 1.5;
+    const baseG = this.ctx.createGain();
+    baseG.gain.setValueAtTime(0, now); baseG.gain.linearRampToValueAtTime(0.22, now + 0.8);
+    base.connect(baseLP).connect(baseG).connect(out);
+    base.start(now); this.activeNodes.push(base);
 
-    // LFO for RPM variation
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.4;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 4;
-    lfo.connect(lfoGain).connect(base.frequency);
-    lfo.start(now);
-    this.activeNodes.push(lfo);
+    // Harmonics
+    this._osc("sine", [[0, 96, false]], [[0, 0, false], [0.8, 0.07, false]], 0, 10);
+    this._osc("sine", [[0, 192, false]], [[0, 0, false], [0.8, 0.03, false]], 0, 10);
 
-    const baseLP = ctx.createBiquadFilter();
-    baseLP.type = 'lowpass';
-    baseLP.frequency.value = 220;
-    baseLP.Q.value = 1.5;
+    // Noise layers
+    this._noise(12, "bandpass", 80, 1.5, [[0, 0], [1.0, 0.06]], 0, 10, true);
+    this._noise(12, "bandpass", 450, 0.4, [[0, 0], [1.5, 0.05]], 0, 10, true);
+    this._noise(12, "highpass", 2200, 0, [[0, 0], [2.0, 0.025]], 0, 10, true);
 
-    const baseGain = ctx.createGain();
-    baseGain.gain.setValueAtTime(0, now);
-    baseGain.gain.linearRampToValueAtTime(0.22, now + 0.8);
-
-    base.connect(baseLP).connect(baseGain).connect(out);
-    base.start(now);
-    this.activeNodes.push(base);
-
-    // ── 2nd harmonic ──
-    const h2 = ctx.createOscillator();
-    h2.type = 'sine';
-    h2.frequency.value = 96;
-    const h2Gain = ctx.createGain();
-    h2Gain.gain.setValueAtTime(0, now);
-    h2Gain.gain.linearRampToValueAtTime(0.07, now + 0.8);
-    h2.connect(h2Gain).connect(out);
-    h2.start(now);
-    this.activeNodes.push(h2);
-
-    // ── 4th harmonic (adds character) ──
-    const h4 = ctx.createOscillator();
-    h4.type = 'sine';
-    h4.frequency.value = 192;
-    const h4Gain = ctx.createGain();
-    h4Gain.gain.setValueAtTime(0, now);
-    h4Gain.gain.linearRampToValueAtTime(0.03, now + 0.8);
-    h4.connect(h4Gain).connect(out);
-    h4.start(now);
-    this.activeNodes.push(h4);
-
-    // ── Exhaust rumble (filtered noise) ──
-    const exBuf = this.createNoiseBuffer(12);
-    const exNoise = ctx.createBufferSource();
-    exNoise.buffer = exBuf;
-    exNoise.loop = true;
-
-    const exBP = ctx.createBiquadFilter();
-    exBP.type = 'bandpass';
-    exBP.frequency.value = 80;
-    exBP.Q.value = 1.5;
-
-    const exGain = ctx.createGain();
-    exGain.gain.setValueAtTime(0, now);
-    exGain.gain.linearRampToValueAtTime(0.06, now + 1.0);
-
-    exNoise.connect(exBP).connect(exGain).connect(out);
-    exNoise.start(now);
-    this.activeNodes.push(exNoise);
-
-    // ── Road / tire noise ──
-    const roadBuf = this.createNoiseBuffer(12);
-    const roadNoise = ctx.createBufferSource();
-    roadNoise.buffer = roadBuf;
-    roadNoise.loop = true;
-
-    const roadBP = ctx.createBiquadFilter();
-    roadBP.type = 'bandpass';
-    roadBP.frequency.value = 450;
-    roadBP.Q.value = 0.4;
-
-    const roadGain = ctx.createGain();
-    roadGain.gain.setValueAtTime(0, now);
-    roadGain.gain.linearRampToValueAtTime(0.05, now + 1.5);
-
-    roadNoise.connect(roadBP).connect(roadGain).connect(out);
-    roadNoise.start(now);
-    this.activeNodes.push(roadNoise);
-
-    // ── Wind noise ──
-    const windBuf = this.createNoiseBuffer(12);
-    const windNoise = ctx.createBufferSource();
-    windNoise.buffer = windBuf;
-    windNoise.loop = true;
-
-    const windHP = ctx.createBiquadFilter();
-    windHP.type = 'highpass';
-    windHP.frequency.value = 2200;
-
-    const windGain = ctx.createGain();
-    windGain.gain.setValueAtTime(0, now);
-    windGain.gain.linearRampToValueAtTime(0.025, now + 2.0);
-
-    windNoise.connect(windHP).connect(windGain).connect(out);
-    windNoise.start(now);
-    this.activeNodes.push(windNoise);
-
-    // ── Auto-stop with fade at 10s ──
     out.gain.setValueAtTime(0.5, now + 8);
     out.gain.linearRampToValueAtTime(0, now + 10);
-
     setTimeout(() => this.stop(), 10500);
   }
 }
