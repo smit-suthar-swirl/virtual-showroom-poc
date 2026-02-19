@@ -73,10 +73,15 @@ export class UIController {
     }
     if (role === "assistant") {
       if (isDone) {
-        this.currentAssistantBubble?.querySelector(".msg-text")?.textContent === undefined
-          ? null
-          : (this.currentAssistantBubble.querySelector(".msg-text").textContent = text);
-        this.currentAssistantBubble = null;
+        if (this.currentAssistantBubble) {
+          this.currentAssistantBubble.querySelector(".msg-text").textContent = text;
+          this.currentAssistantBubble = null;
+        } else {
+          const div = document.createElement("div");
+          div.className = "msg assistant";
+          div.innerHTML = `<div class="msg-label">BYD Assistant</div><div class="msg-text">${this.escapeHtml(text)}</div>`;
+          this.chatEl.appendChild(div);
+        }
         this.scrollChat();
         return;
       }
@@ -89,6 +94,13 @@ export class UIController {
       }
       this.currentAssistantBubble.querySelector(".msg-text").textContent += text;
       this.scrollChat();
+    }
+  }
+
+  clearStreamingBubble() {
+    if (this.currentAssistantBubble) {
+      this.currentAssistantBubble.remove();
+      this.currentAssistantBubble = null;
     }
   }
 

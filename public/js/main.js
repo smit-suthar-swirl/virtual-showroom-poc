@@ -14,8 +14,18 @@ const carModel = new CarModel(carScene);
 const sounds = new CarSounds();
 const audioPlayer = new AudioPlayer();
 const ui = new UIController();
+const CARS = {
+  seal: { name: "Seal",      file: "/models/BYD_Seal_GLB-v1.glb" },
+  atto: { name: "Atto 3",    file: "/models/BYD_ATTO-v11.glb" },
+  han:  { name: "Han EV",    file: "/models/BYD_Han_EV-v4.glb" },
+  song: { name: "Song Plus", file: "/models/BYD_SongPlus-v1.glb" },
+  qin:  { name: "Qin",       file: "/models/BYD_Quin_GLB-v1.glb" },
+};
+let currentCar = "seal";
+
 const mainEl = document.querySelector(".main");
 const toggleBtn = document.getElementById("showroom-toggle-btn");
+const carNameEl = document.getElementById("car-name");
 let idleCount = 0;
 
 const openShowroom = () => {
@@ -42,11 +52,26 @@ carModel.whenReady().then(() => {
   viewModes = new ViewModes(carScene, animations, carModel, ui);
   hotspotSystem = new HotspotSystem(carScene, carModel);
   keywordDetector = new KeywordDetector(handleCommand);
-  carScene.onRender(() => hotspotSystem.update());
+  carScene.onRender(() => hotspotSystem?.update());
   ui.setLoadingState(false);
 }).catch(() => ui.setLoadingState(false));
 
 const CMD = {
+  switch_car: a => {
+    const car = CARS[a?.model];
+    if (!car || a.model === currentCar) return;
+    currentCar = a.model;
+    openShowroom();
+    animations = null; viewModes?.hideUI(); hotspotSystem?.hide(); hotspotSystem = null;
+    carModel.loadCar(car.file).then(() => {
+      animations = new CarAnimations(carScene, carModel);
+      viewModes = new ViewModes(carScene, animations, carModel, ui);
+      hotspotSystem = new HotspotSystem(carScene, carModel);
+      animations.revealCar();
+      setTimeout(() => { viewModes.showUI(); hotspotSystem.show("exterior"); }, 1500);
+    });
+    carNameEl.textContent = car.name;
+  },
   show_car_model:     () => { openShowroom(); animations.revealCar(); setTimeout(() => { viewModes?.showUI(); hotspotSystem?.show("exterior"); }, 1500); },
   hide_car_model:     () => { closeShowroom(); animations.hideCar(); viewModes?.hideUI(); hotspotSystem?.hide(); },
   show_trim_info:     a => { openShowroom(); ui.showTrimPanel(a?.trim || "all"); },
@@ -105,7 +130,8 @@ function sendMessage() {
 
 const toggleRec = on => {
   isRecording = on;
-  if (on) audioPlayer.flush();
+  micBtn.classList.toggle("active", on);
+  if (on) { audioPlayer.flush(); sounds.stop(); ui.clearStreamingBubble(); }
   ws.setRecording(on);
 };
 
@@ -115,7 +141,13 @@ micBtn.addEventListener("mousedown", () => toggleRec(true));
 window.addEventListener("mouseup", () => toggleRec(false));
 micBtn.addEventListener("touchstart", e => { e.preventDefault(); toggleRec(true); }, { passive: false });
 micBtn.addEventListener("touchend", e => { e.preventDefault(); toggleRec(false); }, { passive: false });
-document.addEventListener("keydown", e => e.code === "Space" && e.target === document.body && (e.preventDefault(), toggleRec(true)));
-document.addEventListener("keyup", e => e.code === "Space" && toggleRec(false));
+document.addEventListener("keydown", e => {
+  if (e.code !== "Space" || e.target.matches("input,textarea") || e.repeat) return;
+  e.preventDefault();
+  if (!isRecording) { audioPlayer.flush(); sounds.stop(); toggleRec(true); }
+});
+document.addEventListener("keyup", e => {
+  if (e.code === "Space" && isRecording) toggleRec(false);
+});
 
 ws.connect();

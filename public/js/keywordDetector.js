@@ -25,7 +25,12 @@ const PART_MAP = {
 };
 
 const SPECIAL_MAP = {
-  show_car:       { kw: ["show me the car", "let me see the car", "display the car", "reveal the car"],     r: { command: "show_car_model", args: {} } },
+  switch_seal:    { kw: ["show me the seal", "byd seal", "show seal", "switch to seal", "seal car", "the seal"],          r: { command: "switch_car", args: { model: "seal" } } },
+  switch_atto:    { kw: ["show me the atto", "byd atto", "show atto", "atto 3", "atto3", "switch to atto"],              r: { command: "switch_car", args: { model: "atto" } } },
+  switch_han:     { kw: ["show me the han", "byd han", "show han", "han ev", "switch to han"],                           r: { command: "switch_car", args: { model: "han" } } },
+  switch_song:    { kw: ["show me the song", "byd song", "show song", "song plus", "switch to song"],                    r: { command: "switch_car", args: { model: "song" } } },
+  switch_qin:     { kw: ["show me the qin", "byd qin", "show qin", "qin plus", "switch to qin"],                        r: { command: "switch_car", args: { model: "qin" } } },
+  show_car:       { kw: ["show me the car", "let me see the car", "display the car", "reveal the car"],                  r: { command: "show_car_model", args: {} } },
   hide_car:       { kw: ["hide the car", "close the car", "remove the car"],                                 r: { command: "hide_car_model", args: {} } },
   show_360:       { kw: ["360 view", "360 degree", "rotate the car", "spin the car", "show all angles", "show from every side", "spin it around"], r: { command: "show_360_view", args: {} } },
   open_bonnet:    { kw: ["open the hood", "open bonnet", "open the bonnet", "show engine", "show me the engine"], r: { command: "open_bonnet", args: {} } },

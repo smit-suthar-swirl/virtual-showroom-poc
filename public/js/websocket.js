@@ -6,6 +6,8 @@ export class WebSocketManager {
     this.audioContext = null;
     this.processor = null;
     this.connected = false;
+    this.audioSent = false;
+    this.responseActive = false;
   }
 
   async connect() {
@@ -64,7 +66,7 @@ export class WebSocketManager {
       "transcript.done":  m => cb.onTranscript(m.transcript, m.role, true),
       "ui.command":       m => cb.onUICommand(m.tool, m.args),
       "speech.started":   () => cb.onSpeechStarted(),
-      "status":           m => cb.onStatus(m.status),
+      "status":           m => { if (m.status === "speaking") this.responseActive = true; else if (m.status === "connected") this.responseActive = false; cb.onStatus(m.status); },
       "error":            m => cb.onError?.(m.message),
     };
     dispatch[msg.type]?.(msg);
@@ -87,6 +89,7 @@ export class WebSocketManager {
       let binary = "";
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       this.ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: btoa(binary) }));
+      this.audioSent = true;
     };
     source.connect(this.processor);
     this.processor.connect(this.audioContext.destination);
@@ -94,10 +97,18 @@ export class WebSocketManager {
 
   setRecording(state) {
     this.isRecording = state;
-    if (state) { this.connect(); this.callbacks.onStatus("listening"); }
-    else {
+    if (state) {
+      this.audioSent = false;
+      this.connect();
+      this.callbacks.onStatus("listening");
+    } else {
       this.callbacks.onStatus("connected");
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: "recording_stopped" }));
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.audioSent) {
+        if (this.responseActive) this.ws.send(JSON.stringify({ type: "response.cancel" }));
+        this.ws.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+        this.ws.send(JSON.stringify({ type: "response.create" }));
+      }
+      this.audioSent = false;
     }
   }
 

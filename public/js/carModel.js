@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
-const GLB_PATH = "./models/BYD_Seal_GLB-v1.glb";
+const DEFAULT_GLB = "./models/BYD_Seal_GLB-v1.glb";
 
 const NODE_PATTERNS = [
   [["door"],                          "doors"],
@@ -48,15 +48,24 @@ export class CarModel {
     this.loaded = false;
     this.group.visible = false;
     carScene.scene.add(this.group);
-    this.loadPromise = this.loadModel();
+    this.loadPromise = this.loadModel(DEFAULT_GLB);
   }
 
-  async loadModel() {
+  async loadModel(path = DEFAULT_GLB) {
     const loader = new GLTFLoader();
     if (MeshoptDecoder) loader.setMeshoptDecoder(MeshoptDecoder);
     return new Promise((resolve, reject) => {
-      loader.load(GLB_PATH, (gltf) => { this.processModel(gltf); this.loaded = true; resolve(); }, undefined, reject);
+      loader.load(path, (gltf) => { this.processModel(gltf); this.loaded = true; resolve(); }, undefined, reject);
     });
+  }
+
+  async loadCar(path) {
+    while (this.group.children.length) this.group.remove(this.group.children[0]);
+    this.bodyPanels = []; this.bonnetGroup = null; this.engineGroup = null;
+    this.wheelGroups = []; this.allMeshes = []; this.parts = {};
+    this.loaded = false; this.group.visible = false;
+    this.loadPromise = this.loadModel(path);
+    return this.loadPromise;
   }
 
   processModel(gltf) {
