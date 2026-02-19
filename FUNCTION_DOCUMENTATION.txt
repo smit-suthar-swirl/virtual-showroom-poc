@@ -1,0 +1,202 @@
+DETAILED FUNCTION DOCUMENTATION
+===============================
+
+This document provides an in-depth explanation of every major function across the codebase, organized by file.
+
+--------------------------------------------------------------------------------
+1. SERVER SIDE
+--------------------------------------------------------------------------------
+
+FILE: server/index.js
+---------------------
+*   (Anonymous Entry Logic)
+    *   Description: Initializes the Express app and WebSocket server.
+    *   Logic: Checks for OPENAI_API_KEY. Sets up static file serving from public/. Creates an HTTP server and upgrades it to a WebSocket server on path /ws.
+    *   Events:
+        *   wss.on("connection"): Triggered when a frontend client connects. Logs the connection and calls handleConnection(clientWs).
+        *   server.listen(PORT): Starts the server.
+
+FILE: server/streamHandler.js
+-----------------------------
+*   mk(name, desc, params) / mkReq(name, desc, params, required)
+    *   Description: Helper functions to create JSON objects formatted for OpenAI's "tools" definition.
+    *   Returns: A simplified JSON schema object.
+
+*   handleConnection(clientWs)
+    *   Description: The core logic for bridging a client to OpenAI.
+    *   Logic:
+        1.  Establishes a connection to OpenAI's Realtime API (wss://api.openai.com...).
+        2.  pendingCalls Map: Tracks function calls requested by OpenAI but not yet completed (waiting for arguments).
+        3.  openaiWs.on("open"):
+            *   Sends session.update: Configures the AI with instructions, voice (alloy), tools (car controls), and VAD (Voice Activity Detection).
+            *   Sends {type: "status", status: "connected"} to the frontend.
+        4.  handlers Object: Maps OpenAI events to actions.
+            *   response.audio.delta: Relays audio chunks to client.
+            *   response.function_call_arguments.done:
+                *   Parses the JSON arguments.
+                *   Logs the tool call.
+                *   Sends {type: "ui.command"} to the client to trigger 3D actions.
+                *   Sends "function_call_output" back to OpenAI (mocking success) so the AI knows the action happened.
+                *   Triggers response.create to ask OpenAI for the next response (usually speech).
+        5.  clientHandlers Object: Maps Client events to OpenAI actions.
+            *   input_audio_buffer.append: Forwards mic audio to OpenAI.
+            *   input_audio_buffer.commit: Tells OpenAI "user stopped speaking, process now".
+
+--------------------------------------------------------------------------------
+2. FRONTEND - CORE
+--------------------------------------------------------------------------------
+
+FILE: public/js/main.js
+-----------------------
+*   (Initialization)
+    *   Instantiates CarScene, CarModel, CarSounds, UIController, etc.
+
+*   openShowroom()
+    *   Description: Transitons the UI from "chat only" to "3D view".
+    *   Logic: Adds showroom-open class to the main container. Triggers a window resize event to fix Three.js aspect ratios.
+
+*   closeShowroom()
+    *   Description: Hides the 3D view.
+    *   Logic: Removes showroom-open class.
+
+*   CMD (Object)
+    *   Description: A dictionary mapping tool names (string) to executable functions.
+    *   Entries:
+        *   show_car_model: Opens showroom, calls animations.revealCar().
+        *   highlight_part: Calls animations.highlightPart(a.part).
+        *   switch_to_interior: Sets view mode to interior.
+        *   ...and others (see code for full list).
+
+*   handleCommand(tool, args)
+    *   Description: The central dispatcher.
+    *   Logic:
+        *   Checks if animations are ready. If not, waits for carModel to load, then retries.
+        *   Executes CMD[tool](args).
+
+*   WebSocketManager Callback Implementation
+    *   onAudioDelta: Feeds audio to audioPlayer.
+    *   onTranscript: Updates UI chat bubbles. If it's a user message, runs keywordDetector.
+    *   onUICommand: Calls handleCommand.
+
+FILE: public/js/websocket.js
+----------------------------
+Class: WebSocketManager
+*   connect()
+    *   Description: Opens the WebSocket connection.
+    *   Logic: Gets microphone access (getUserMedia). Creates WebSocket. Sets up audio processor.
+*   setupAudioProcessor()
+    *   Description: Sets up the AudioContext pipeline for capturing mic input.
+    *   Logic: Creates a ScriptProcessor. Converts raw float32 audio (from mic) to Int16 (required by OpenAI). Base64 encodes it and sends it via WebSocket.
+*   setRecording(state)
+    *   Description: Toggles recording state.
+    *   Logic: If true, ensures connection and sends audio. If false, sends recording_stopped signal (though logic handles VAD automatically usually).
+
+Class: AudioPlayer
+*   enqueue(base64)
+    *   Description: Adds incoming audio to a playback queue.
+    *   Logic: Decodes Base64 -> Float32. Creates an AudioBuffer. Pushes to this.queue.
+*   playNext()
+    *   Description: Plays the next buffer in queue.
+    *   Logic: Uses AudioBufferSourceNode. Schedules playback precisely using audioCtx.currentTime to ensure gapless audio.
+
+FILE: public/js/keywordDetector.js
+----------------------------------
+*   detect(text)
+    *   Description: Scans user text for specific triggers.
+    *   Logic:
+        *   Checks SPECIAL_MAP for phrases like "open hood". Returns corresponding tool command.
+        *   Checks COLOR_TRIGGERS.
+        *   Checks PART_MAP (e.g., "windshield") -> returns highlight_part.
+*   process(text)
+    *   Description: Convenience wrapper.
+    *   Logic: Calls detect. If match found, calls handleCommand immediately.
+
+--------------------------------------------------------------------------------
+3. FRONTEND - 3D GRAPHICS
+--------------------------------------------------------------------------------
+
+FILE: public/js/carScene.js
+---------------------------
+*   constructor(canvas)
+    *   Description: Sets up the Three.js world.
+    *   Logic: Creates Scene, PerspectiveCamera (Fov 38), WebGLRenderer (with ACESFilmicToneMapping for realism). Calls setup functions.
+*   setupEnvironment()
+    *   Description: Creates a fake "studio" reflection.
+    *   Logic: Creates rectangular light panels (Meshes) in a separate scene. Uses PMREMGenerator to bake this into an environment texture. This is why the car paint reflects "lights".
+*   setupLights()
+    *   Description: Adds actual light sources.
+    *   Logic:
+        *   RectAreaLight: Main soft light from above.
+        *   SpotLight (rim): Backlight for dramatic edges.
+*   setupGround()
+    *   Description: Creates the floor.
+    *   Logic: Uses a PlaneGeometry with a custom noise texture (generated via canvas 2d) for rough asphalt look. Added a TorusGeometry for the glowing ring.
+*   animate()
+    *   Description: The main render loop.
+    *   Logic: Calls renderer.render(). Updates camera controls. Recursively calls requestAnimationFrame.
+
+FILE: public/js/carModel.js
+---------------------------
+*   classifyMesh(nodeName, matName)
+    *   Description: Determines what "part" a 3D mesh belongs to.
+    *   Logic: Checks mesh names against NODE_PATTERNS regex. E.g., if name contains "frunk", it's "hood". If material is "glass", it's "window".
+*   loadModel()
+    *   Description: Loads the GLB file.
+    *   Logic: Uses GLTFLoader. Calls processModel on success.
+*   processModel(gltf)
+    *   Description: Organizes the raw 3D hierarchy.
+    *   Logic:
+        1.  Rescales model to fit scene.
+        2.  Traverses all children. Classifies them.
+        3.  Adds meshes to partGroups (e.g., all 4 meshes making up a door go into one group).
+        4.  Sets up specialized groups (bonnetGroup, doorPivots logic is handled in Animations).
+*   setColor(colorName)
+    *   Description: Swaps body paint.
+    *   Logic: Finds all meshes classified as "body". Clones their material and changes .color.
+*   highlightPart(partName)
+    *   Description: Makes a part glow red.
+    *   Logic:
+        1.  Finds the group for partName.
+        2.  Backs up original material.
+        3.  Replaces material with an emissive red material.
+        4. Calculates and Returns the center position (Vector3) of that part so the camera knows where to look.
+
+FILE: public/js/carAnimations.js
+--------------------------------
+*   Tween Class
+    *   Description: A custom, lightweight animation library.
+    *   update(dt): Interpolates values (0 to 1) based on easing functions (Linear, Cubic, Back).
+*   revealCar()
+    *   Description: The "Drop in" intro.
+    *   Logic: Scales car from 0.01 to 1. Moves Y from -1.5 to 0. Rotates 360 degrees.
+*   _doHighlight(partName)
+    *   Description: Sequences the camera move to a specific part.
+    *   Logic:
+        1.  Calls car.highlightPart to get the target center.
+        2.  Calculates best camera angle based on part position (e.g., if part is on left, move camera left).
+        3.  Calls animateCamera to move there.
+        4.  Sets a timeout to reset view after 8 seconds.
+*   _preparePivots()
+    *   Description: Creates hinge points for doors/hood dynamically.
+    *   Logic:
+        *   Finds bounding box of a door.
+        *   Identifies the "hinge" edge (e.g., min X for left door).
+        *   Creates a Group at that edge, attaches the door meshes to it. Now rotating the Group opens the door correctly.
+*   _doOpenAllDoors()
+    *   Description: Opens everything.
+    *   Logic: Rotates door pivots to ~75 degrees. Rotates trunk/hood pivots. Moves camera to a high angle.
+*   show360View()
+    *   Description: Orbit animation.
+    *   Logic: Manually updates camera X/Z positions using Math.cos and Math.sin over time.
+
+FILE: public/js/viewModes.js
+----------------------------
+*   switchToInterior(row)
+    *   Description: Changes camera constraints for interior access.
+    *   Logic:
+        *   Sets minDistance/maxDistance very small (0.01 - 0.2) so camera doesn't clip.
+        *   Disables panning.
+        *    moves camera to interior_1st_row preset coordinates.
+*   switchToExterior()
+    *   Description: Resets to outside view.
+    *   Logic: Restores normal minDistance (2.0). Moves camera to default position.

@@ -1,0 +1,110 @@
+TECHNICAL EXPLANATION OF THE BYD SEAL 3D VOICE ASSISTANT
+======================================================
+
+This document provides a comprehensive technical breakdown of the BYD Seal 3D Voice Assistant application. The system is a real-time, interactive 3D web application powered by OpenAI's Realtime API (GPT-4o) and Three.js.
+
+1. ARCHITECTURE OVERVIEW
+------------------------
+The application follows a Client-Server architecture:
+- Frontend: Vanilla JavaScript (ES Module based) + Three.js for 3D rendering.
+- Backend: Node.js (Express) + WebSocket server acting as a proxy to OpenAI.
+- AI Core: OpenAI Realtime API handling speech-to-speech and logic.
+
+FLOW:
+User speaks -> Audio captured (Frontend) -> Streamed to Server -> Relayed to OpenAI -> OpenAI processes audio/text -> OpenAI sends Audio Response + Tool Calls -> Server relays to Frontend -> Frontend plays audio & executes 3D animations.
+
+2. BACKEND (Server-Side)
+------------------------
+Location: /server
+
+A. server/index.js (Entry Point)
+   - Sets up an Express server to serve the static frontend files (public folder).
+   - Initializes a WebSocket Server (ws) on port 3000 (default).
+   - listens for incoming connections on /ws and delegates handling to streamHandler.js.
+
+B. server/streamHandler.js (The AI Bridge)
+   - Purpose: Manages the persistent WebSocket connection with OpenAI's Realtime API.
+   - Key Components:
+     - tools: A JSON array defining "functions" the AI can call. These are the bridge between natural language and code.
+       * Example: If user says "Show me the engine", the AI calls the tool open_bonnet.
+     - SYSTEM_INSTRUCTIONS: The "Brain" or prompt. It tells the AI who it is (BYD Assistant), how to behave, and critically, forces it to call tools for visual actions instead of just describing them.
+   - Handshake:
+     - When a client connects, the server connects to wss://api.openai.com/....
+     - It sends a session.update event to configure the AI (voice, tools, instructions).
+   - Event Loop:
+     - response.audio.delta: Streams audio chunks from AI -> Client.
+     - response.function_call_arguments.done: Triggered when AI wants to perform an action. The server parses this and sends a ui.command message to the client.
+
+3. FRONTEND (Client-Side)
+-------------------------
+Location: /public/js
+
+A. main.js (The Controller)
+   - The central hub that initializes all other classes.
+   - Startup:
+     1. Creates the 3D Scene (CarScene).
+     2. Loads the Car Model (CarModel).
+     3. Connects WebSocket (WebSocketManager).
+   - Command Handling: Contains a CMD object that maps tool names (received from server) to actual JavaScript functions.
+     * CMD.show_car_model -> calls openShowroom() and animations.revealCar().
+   - User Input: Handles microphone button logic (push-to-talk).
+
+B. carScene.js (The 3D Engine)
+   - Wraps Three.js boilerplates.
+   - Setup: Creates Scene, Camera, WebGLRenderer.
+   - Lighting: Sets up studio lighting (RectAreaLight, SpotLights) to make the car look realistic.
+   - Environment: Generates a reflection map so the car paint looks shiny.
+   - Loop: Runs requestAnimationFrame to render the scene 60 times a second.
+
+C. carModel.js (The Asset Manager)
+   - Loading: Uses GLTFLoader to load the BYD_Seal_GLB-v1.glb file.
+   - Parsing: The most complex part. It traverses the 3D model's node tree.
+     - It uses NODE_PATTERNS (regex) to identify parts (e.g., if a mesh is named "door_fl", it knows it's the Front-Left Door).
+     - It groups these meshes logically so we can control them later (e.g., "all wheels", "entire hood").
+   - Features:
+     - setColor(): Changes the material color of the car body.
+     - highlightPart(): Temporarily changes a part's material to glowing red to draw attention.
+
+D. carAnimations.js (The Motion System)
+   - Handles all movement using a custom Tween class (lighter than GSAP).
+   - Camera Movements: animateCamera(position, target) smoothly moves the viewpoint.
+   - Mechanics:
+     - openAllDoors(): Rotates the door 'pivot' groups to simulate opening.
+     - revealCar(): A specific sequence where the car scales up and drops down (spawn animation).
+     - show360View(): Orbits the camera in a circle around the car.
+
+E. websocket.js (The Communicator)
+   - Microphone: Uses navigator.mediaDevices.getUserMedia to get audio.
+   - Processing: Uses a ScriptProcessor to convert raw audio to PCM16 format (required by OpenAI).
+   - Audio Player: Receives base64 audio chunks from the server, decodes them, and plays them in a queue for smooth speech.
+
+F. viewModes.js (Camera Logic)
+   - Manages "States" (Interior vs Exterior).
+   - Presets: Definitions of where the camera should be for "Front", "Side", "Driver Seat", etc.
+   - Limits: When inside the car, it restricts camera movement so you can't clip through the roof.
+
+G. keywordDetector.js (Local Intelligence)
+   - Optimization: Sends text input through a local check BEFORE or WHILE sending to AI.
+   - Latency Reduction: If the user types "Show me the car", this script detects it immediately and triggers the animation instantly, without waiting for the full round-trip to OpenAI. This makes the UI feel snappier.
+
+4. DATA FLOW EXAMPLE: "Open the hood"
+-------------------------------------
+1. User speaks "Can you open the hood?".
+2. websocket.js captures audio -> sends to server.
+3. server streams audio to OpenAI.
+4. OpenAI recognizes intent -> decides to call tool open_bonnet.
+5. OpenAI sends function_call event to server.
+6. server sends JSON { type: "ui.command", tool: "open_bonnet" } to client.
+7. websocket.js receives message -> triggers callback.
+8. main.js receives callback -> looks up CMD["open_bonnet"].
+9. CMD executes animations.openBonnet().
+10. carAnimations.js calculates camera path + rotates hood mesh.
+11. OpenAI generates audio "Sure, opening the hood now." -> streams back to user.
+
+5. TECH STACK SUMMARY
+---------------------
+- Runtime: Node.js
+- Network: WebSocket (Real-time bidirectional)
+- 3D: Three.js (WebGL abstraction)
+- AI: OpenAI Realtime API (GPT-4o Audio)
+- Format: GLB (Binary glTF for 3D models)
