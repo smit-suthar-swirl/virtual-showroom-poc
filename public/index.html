@@ -1,144 +1,127 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BYD — 3D Voice Assistant</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./css/styles.css" />
-  </head>
-  <body>
-    <div class="app">
-      <header class="header">
-        <div class="brand">
-          <h1 class="brand-title">BYD <span id="car-name">Assistant</span></h1>
-          <p class="brand-tagline">3D Voice Assistant</p>
-        </div>
-        <button id="showroom-toggle-btn" class="showroom-toggle-btn" title="Toggle 3D View">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          <span>3D View</span>
-        </button>
-        <div id="status" class="status disconnected">
-          <span class="status-dot"></span>
-          <span id="status-text">Disconnected</span>
-        </div>
-      </header>
-      <main class="main">
-        <section class="viewport" id="viewport">
-          <canvas id="three-canvas"></canvas>
-          <div id="viewport-toolbar" class="viewport-toolbar hidden">
-            <div class="view-toggle">
-              <button id="btn-exterior" class="view-toggle-btn active" data-view="exterior">Exterior</button>
-              <button id="btn-interior" class="view-toggle-btn" data-view="interior">Interior</button>
-            </div>
-            <div id="seating-rows-dropdown" class="seating-dropdown hidden">
-              <button id="seating-rows-btn" class="seating-rows-btn">
-                <span id="seating-rows-label">Seating Rows - 1st Row</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-              <div id="seating-rows-menu" class="seating-rows-menu hidden">
-                <button data-row="1" class="seating-row-option active">1st Row</button>
-                <button data-row="2" class="seating-row-option">2nd Row</button>
-              </div>
-            </div>
-          </div>
-          <div id="tech-details-panel" class="tech-details-panel hidden">
-            <div class="tech-header">
-              <span>Technical Details</span>
-              <span class="tech-badge">Seal</span>
-            </div>
-            <div class="tech-stats">
-              <div class="tech-stat">
-                <div class="tech-row"><span class="tech-value">523</span><span class="tech-unit">HP</span></div>
-                <span class="tech-label">Power Output</span>
-              </div>
-              <div class="tech-stat">
-                <div class="tech-row"><span class="tech-value">3.8</span><span class="tech-unit">S</span></div>
-                <span class="tech-label">0-100 km/h</span>
-              </div>
-              <div class="tech-stat">
-                <div class="tech-row"><span class="tech-value">520</span><span class="tech-unit">Km</span></div>
-                <span class="tech-label">WLTP Combined</span>
-              </div>
-            </div>
-          </div>
-          <div id="hotspot-container" class="hotspot-container"></div>
-          <div id="hotspot-popup" class="hotspot-popup hidden">
-            <button id="hotspot-popup-close" class="hotspot-popup-close">&times;</button>
-            <h3 id="hotspot-popup-title" class="hotspot-popup-title"></h3>
-            <p id="hotspot-popup-body" class="hotspot-popup-body"></p>
-          </div>
-          <div id="bottom-nav" class="bottom-nav hidden">
-            <button class="bottom-nav-btn" data-preset="front" title="Front View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/></svg>
-            </button>
-            <button class="bottom-nav-btn" data-preset="rear" title="Rear View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            </button>
-            <button class="bottom-nav-btn" data-preset="side_right" title="Side View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 14l4-6h8l4 6"/><circle cx="7" cy="16" r="2"/><circle cx="17" cy="16" r="2"/></svg>
-            </button>
-            <button class="bottom-nav-btn" data-preset="three_quarter" title="3/4 View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15l3-5h6l3 3h3l2 2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-            </button>
-            <button class="bottom-nav-btn" data-preset="doors_open" title="Doors Open View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="12" height="16" rx="1"/><path d="M6 10L2 8v8l4-2"/><path d="M18 10l4-2v8l-4-2"/></svg>
-            </button>
-            <button class="bottom-nav-btn" data-preset="360" title="360 View">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.22-8.56"/><path d="M21 3v5h-5"/></svg>
-            </button>
-          </div>
-          <div id="interior-hint" class="interior-hint hidden">Tap to Rotate</div>
-          <div id="trim-panel" class="trim-panel hidden"></div>
-          <div id="car-info-overlay" class="car-info-overlay hidden"></div>
-        </section>
-        <aside class="panel">
-          <div class="chat" id="chat">
-            <div class="chat-welcome">
-              <div class="chat-welcome-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M12 18.5a6.5 6.5 0 006.5-6.5V8a6.5 6.5 0 00-13 0v4a6.5 6.5 0 006.5 6.5z" />
-                  <path d="M12 18.5V22m-4 0h8" />
-                </svg>
-              </div>
-              <p>Click the mic button and ask me anything about the <strong>BYD Seal</strong>.</p>
-              <p class="chat-hint">Try: "Show me the car" or "Tell me about the engine"</p>
-            </div>
-          </div>
-          <div class="voice-section">
-            <div class="visualizer" id="visualizer">
-              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            </div>
-            <div class="input-container">
-              <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
-              <button id="send-btn" title="Send message">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
-              </button>
-            </div>
-            <button class="mic-btn" id="mic-btn" title="Hold to speak">
-              <svg class="mic-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 1a4 4 0 00-4 4v7a4 4 0 008 0V5a4 4 0 00-4-4z" />
-                <path d="M19 10v2a7 7 0 01-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-              <svg class="stop-icon hidden" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-            </button>
-            <p class="mic-hint" id="mic-hint">Hold to speak or type below</p>
-          </div>
-        </aside>
-      </main>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BYD 3D Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- 3D Viewport (70%) -->
+    <div class="viewport" id="viewport">
+      <canvas id="three-canvas"></canvas>
+      <div class="car-label">BYD <span class="accent" id="car-name">Seal</span></div>
     </div>
-    <script type="importmap">
-      { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
-    </script>
-    <script type="module" src="./js/main.js"></script>
-  </body>
+
+    <!-- Control Panel (30%) -->
+    <aside class="panel">
+      <div class="panel-header">
+        <h1>BYD <span>3D Viewer</span></h1>
+        <p>Interactive Showroom</p>
+      </div>
+
+      <div class="panel-body">
+
+        <!-- Models -->
+        <section class="ctrl-section">
+          <h3>Model</h3>
+          <div class="btn-row">
+            <button class="btn car-btn active" data-car="seal">Seal</button>
+            <button class="btn car-btn" data-car="atto">Atto 3</button>
+            <button class="btn car-btn" data-car="han">Han EV</button>
+            <button class="btn car-btn" data-car="song">Song+</button>
+            <button class="btn car-btn" data-car="qin">Qin</button>
+          </div>
+        </section>
+
+        <!-- View -->
+        <section class="ctrl-section">
+          <h3>View</h3>
+          <div class="btn-row">
+            <button class="btn view-btn active" data-view="exterior">Exterior</button>
+            <button class="btn view-btn" data-view="interior-1">Interior R1</button>
+            <button class="btn view-btn" data-view="interior-2">Interior R2</button>
+          </div>
+        </section>
+
+        <!-- Camera -->
+        <section class="ctrl-section">
+          <h3>Camera</h3>
+          <div class="btn-grid">
+            <button class="btn preset-btn" data-preset="front">Front</button>
+            <button class="btn preset-btn" data-preset="rear">Rear</button>
+            <button class="btn preset-btn" data-preset="side">Side</button>
+            <button class="btn preset-btn" data-preset="quarter">3/4 View</button>
+            <button class="btn preset-btn" data-preset="top">Top</button>
+            <button class="btn preset-btn accent-btn" data-preset="360">360°</button>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="ctrl-section">
+          <h3>Actions</h3>
+          <div class="btn-grid">
+            <button class="btn action-btn" data-action="open_hood">Open Hood</button>
+            <button class="btn action-btn" data-action="close_hood">Close Hood</button>
+            <button class="btn action-btn" data-action="open_doors">Open Doors</button>
+            <button class="btn action-btn" data-action="close_doors">Close Doors</button>
+          </div>
+        </section>
+
+        <!-- Exterior Parts -->
+        <section class="ctrl-section">
+          <h3>Exterior Parts</h3>
+          <div class="btn-grid">
+            <button class="btn part-btn" data-part="headlights">Headlights</button>
+            <button class="btn part-btn" data-part="taillights">Taillights</button>
+            <button class="btn part-btn" data-part="wheels">Wheels</button>
+            <button class="btn part-btn" data-part="grille">Grille</button>
+            <button class="btn part-btn" data-part="hood">Hood</button>
+            <button class="btn part-btn" data-part="trunk">Trunk</button>
+            <button class="btn part-btn" data-part="doors">Doors</button>
+            <button class="btn part-btn" data-part="mirrors">Mirrors</button>
+            <button class="btn part-btn" data-part="body">Body</button>
+            <button class="btn part-btn" data-part="windshield">Windshield</button>
+          </div>
+        </section>
+
+        <!-- Interior Parts -->
+        <section class="ctrl-section">
+          <h3>Interior Parts</h3>
+          <div class="btn-grid">
+            <button class="btn part-btn" data-part="dashboard">Dashboard</button>
+            <button class="btn part-btn" data-part="seats">Seats</button>
+            <button class="btn part-btn" data-part="infotainment_screen">Screen</button>
+            <button class="btn part-btn" data-part="steering_wheel">Steering</button>
+            <button class="btn part-btn" data-part="center_console">Console</button>
+            <button class="btn part-btn" data-part="instrument_cluster">Cluster</button>
+          </div>
+        </section>
+
+        <!-- Color -->
+        <section class="ctrl-section">
+          <h3>Color</h3>
+          <div class="color-swatches">
+            <button class="color-btn" data-color="white"  style="background:#d0d4dc" title="White"></button>
+            <button class="color-btn" data-color="black"  style="background:#222228" title="Black"></button>
+            <button class="color-btn" data-color="silver" style="background:#b8bcc5" title="Silver"></button>
+            <button class="color-btn" data-color="blue"   style="background:#2255aa" title="Blue"></button>
+            <button class="color-btn" data-color="red"    style="background:#bb1830" title="Red"></button>
+          </div>
+        </section>
+
+      </div><!-- /panel-body -->
+    </aside>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
+  </script>
+  <script type="module" src="./js/app.js"></script>
+</body>
 </html>
